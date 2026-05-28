@@ -14,7 +14,7 @@
   }
   html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace}
   canvas{position:absolute;top:0;left:0}
-  #webcam{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s;transform:scaleX(-1)}
+  #webcam{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s;transform:scaleX(-1);z-index:0}
   #webcam.visible{opacity:1}
   #canvas-bg{z-index:1}
   #canvas-scan{z-index:2;pointer-events:none}
@@ -65,6 +65,7 @@
   .start-btn{font-family:'Orbitron',monospace;font-size:14px;letter-spacing:5px;color:#000;background:var(--cyan);border:none;padding:15px 50px;cursor:pointer;pointer-events:all;text-transform:uppercase;box-shadow:0 0 30px var(--cyan),0 0 60px rgba(0,245,255,0.3);transition:all 0.3s;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%)}
   .start-btn:hover{background:#fff;box-shadow:0 0 50px var(--cyan),0 0 100px rgba(0,245,255,0.5);transform:scale(1.05)}
   .start-warning{font-size:10px;letter-spacing:2px;color:rgba(0,245,255,0.3);text-align:center}
+  .start-warning.error{color:var(--red);max-width:560px;line-height:1.8}
   
   .scanline-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);opacity:0.5}
   
@@ -276,6 +277,7 @@ async function initSystem(){
   initAudio();
   const overlay=document.getElementById('start-overlay');
   const bar=document.getElementById('loading-bar');
+  const warning=document.querySelector('.start-warning');
   
   // Animate loading
   let prog=0;
@@ -286,9 +288,14 @@ async function initSystem(){
   },150);
   
   try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+      throw new Error('Camera access requires Live Server on localhost or HTTPS.');
+    }
+
     const stream=await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720,facingMode:'user'}});
     const vid=document.getElementById('webcam');
     vid.srcObject=stream;
+    await vid.play();
     vid.classList.add('visible');
     
     setStatus('cam',true,'CAMERA — ACTIVE');
@@ -305,9 +312,13 @@ async function initSystem(){
     },800);
     
   }catch(e){
+    console.error('Camera initialization failed:',e);
     clearInterval(loadInterval);
     bar.style.background='#ff3355';
     bar.style.width='100%';
+    warning.classList.add('error');
+    warning.textContent='CAMERA FAILED: '+(e.name||'Error')+' - '+(e.message||'Check browser permission and use http://localhost or http://127.0.0.1.');
+    setStatus('cam',false,'CAMERA - ERROR');
     // Demo mode without webcam
     setTimeout(()=>{
       overlay.classList.add('hidden');
@@ -1192,7 +1203,7 @@ function resetScan(){
   ghostAlpha=0;
   scanSpeed=3;
   setStatus('scan',false,'SCAN ENGINE — IDLE');
-  document.getElementById('d-wave').textContent='--');
+  document.getElementById('d-wave').textContent='--';
   spawnText('READY FOR NEXT SCAN',W/2-90,H/2,currentModeColor);
 }
 
