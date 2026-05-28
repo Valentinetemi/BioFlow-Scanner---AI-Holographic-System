@@ -3,1225 +3,527 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BioFlow Scanner — AI Holographic System</title>
+<title>Reality Bender</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box}
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap');
   :root{
-    --cyan:#00f5ff;--blue:#0080ff;--purple:#8b00ff;--pink:#ff00aa;
-    --green:#00ff88;--amber:#ffaa00;--red:#ff3355;
-    --bg:#000008;--surface:rgba(0,20,40,0.85);
+    --cyan:#38f7ff;
+    --violet:#9c5cff;
+    --magenta:#ff3df2;
+    --gold:#ffd36a;
+    --red:#ff4c6a;
+    --green:#4dff9d;
+    --ink:#03040d;
   }
-  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace}
-  canvas{position:absolute;top:0;left:0}
-  #webcam{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity 1s;transform:scaleX(-1);z-index:0}
-  #webcam.visible{opacity:1}
-  #canvas-bg{z-index:1}
-  #canvas-scan{z-index:2;pointer-events:none}
-  #canvas-hud{z-index:3;pointer-events:none}
-  #ui{position:absolute;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none}
-  
-  .corner{position:absolute;width:60px;height:60px;opacity:0.7}
-  .corner-tl{top:20px;left:20px;border-top:2px solid var(--cyan);border-left:2px solid var(--cyan)}
-  .corner-tr{top:20px;right:20px;border-top:2px solid var(--cyan);border-right:2px solid var(--cyan)}
-  .corner-bl{bottom:20px;left:20px;border-bottom:2px solid var(--cyan);border-left:2px solid var(--cyan)}
-  .corner-br{bottom:20px;right:20px;border-bottom:2px solid var(--cyan);border-right:2px solid var(--cyan)}
-  
-  #title-bar{position:absolute;top:30px;left:50%;transform:translateX(-50%);text-align:center}
-  #title-bar h1{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:var(--cyan);letter-spacing:8px;text-shadow:0 0 20px var(--cyan),0 0 40px var(--cyan)}
-  #title-bar .sub{font-size:11px;letter-spacing:5px;color:rgba(0,245,255,0.5);margin-top:4px}
-  
-  #status-panel{position:absolute;top:90px;left:30px;width:220px}
-  #status-panel .label{font-size:10px;letter-spacing:3px;color:rgba(0,245,255,0.4);margin-bottom:8px;text-transform:uppercase}
-  .status-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;font-size:11px;color:var(--cyan);letter-spacing:1px}
-  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
-  .status-dot.warn{background:var(--amber);box-shadow:0 0 8px var(--amber)}
-  .status-dot.inactive{background:rgba(0,245,255,0.2);box-shadow:none;animation:none}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-  
-  #data-panel{position:absolute;top:90px;right:30px;width:220px;text-align:right}
-  .data-row{font-size:11px;color:var(--cyan);letter-spacing:1px;margin-bottom:5px;opacity:0.7}
-  .data-val{color:var(--green);font-family:'Orbitron',monospace;font-size:12px}
-  
-  #gesture-panel{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:20px;align-items:center}
-  .gesture-chip{font-size:10px;letter-spacing:2px;color:rgba(0,245,255,0.5);border:1px solid rgba(0,245,255,0.2);padding:5px 12px;background:rgba(0,20,40,0.6)}
-  .gesture-chip.active{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(0,245,255,0.3);background:rgba(0,245,255,0.1);animation:chipPulse 0.5s ease}
-  @keyframes chipPulse{0%{transform:scale(1)}50%{transform:scale(1.05)}100%{transform:scale(1)}}
-  
-  #diagnostics{position:absolute;bottom:80px;right:30px;width:250px}
-  .diag-line{font-size:10px;color:rgba(0,245,255,0.6);letter-spacing:1px;margin-bottom:3px;display:flex;justify-content:space-between}
-  .diag-bar{height:2px;background:rgba(0,245,255,0.1);margin-bottom:8px;position:relative;overflow:hidden}
-  .diag-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));transition:width 0.5s ease;box-shadow:0 0 6px var(--cyan)}
-  
-  #scan-mode{position:absolute;bottom:80px;left:30px;width:200px}
-  .mode-label{font-size:10px;letter-spacing:3px;color:rgba(0,245,255,0.4);margin-bottom:10px}
-  .mode-item{font-size:11px;color:rgba(0,245,255,0.3);letter-spacing:2px;margin-bottom:5px;padding-left:10px;border-left:2px solid transparent;transition:all 0.3s}
-  .mode-item.active{color:var(--cyan);border-left-color:var(--cyan);padding-left:15px;text-shadow:0 0 10px var(--cyan)}
-  
-  #start-overlay{position:absolute;top:0;left:0;width:100%;height:100%;z-index:20;background:rgba(0,0,8,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;transition:opacity 1s}
-  #start-overlay.hidden{opacity:0;pointer-events:none}
-  .start-title{font-family:'Orbitron',monospace;font-size:36px;font-weight:900;color:var(--cyan);letter-spacing:10px;text-align:center;text-shadow:0 0 30px var(--cyan),0 0 60px rgba(0,245,255,0.3)}
-  .start-sub{font-size:13px;letter-spacing:4px;color:rgba(0,245,255,0.5);text-align:center;max-width:500px;line-height:2}
-  .start-btn{font-family:'Orbitron',monospace;font-size:14px;letter-spacing:5px;color:#000;background:var(--cyan);border:none;padding:15px 50px;cursor:pointer;pointer-events:all;text-transform:uppercase;box-shadow:0 0 30px var(--cyan),0 0 60px rgba(0,245,255,0.3);transition:all 0.3s;clip-path:polygon(10px 0%,100% 0%,calc(100% - 10px) 100%,0% 100%)}
-  .start-btn:hover{background:#fff;box-shadow:0 0 50px var(--cyan),0 0 100px rgba(0,245,255,0.5);transform:scale(1.05)}
-  .start-warning{font-size:10px;letter-spacing:2px;color:rgba(0,245,255,0.3);text-align:center}
-  .start-warning.error{color:var(--red);max-width:560px;line-height:1.8}
-  
-  .scanline-overlay{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:4;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);opacity:0.5}
-  
-  #fps-counter{position:absolute;top:10px;right:10px;font-size:9px;color:rgba(0,245,255,0.3);letter-spacing:1px;z-index:15}
-  
-  .progress-ring{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0;transition:opacity 0.5s;pointer-events:none;z-index:5}
-  
-  #loading-bar{position:absolute;bottom:0;left:0;height:2px;background:var(--cyan);width:0%;box-shadow:0 0 10px var(--cyan);transition:width 0.3s;z-index:25}
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:var(--ink);font-family:'Share Tech Mono',monospace;color:#eaffff}
+  #webcam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:0;transition:opacity .8s;z-index:0;filter:saturate(1.15) contrast(1.05)}
+  #webcam.visible{opacity:.58}
+  canvas{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none}
+  #shade{position:absolute;inset:0;z-index:1;pointer-events:none;background:
+    radial-gradient(circle at 50% 40%,rgba(88,45,200,.12),transparent 42%),
+    linear-gradient(90deg,rgba(2,4,18,.86),rgba(2,4,18,.18) 45%,rgba(2,4,18,.82));
+    mix-blend-mode:multiply}
+  #ui{position:absolute;inset:0;z-index:4;pointer-events:none}
+  #brand{position:absolute;top:24px;left:28px}
+  #brand h1{font-family:'Orbitron',monospace;font-size:28px;line-height:1;margin:0;color:#fff;letter-spacing:5px;text-shadow:0 0 18px var(--cyan),0 0 42px rgba(156,92,255,.9)}
+  #brand .tag{margin-top:7px;font-size:11px;letter-spacing:4px;color:rgba(210,250,255,.62)}
+  #status{position:absolute;top:27px;right:30px;text-align:right;font-size:11px;letter-spacing:2px;color:rgba(230,255,255,.68)}
+  .dot{display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:#27334a;box-shadow:none}
+  .dot.on{background:var(--green);box-shadow:0 0 14px var(--green)}
+  .dot.warn{background:var(--gold);box-shadow:0 0 14px var(--gold)}
+  #powerReadout{position:absolute;left:30px;bottom:28px;width:min(430px,calc(100vw - 60px))}
+  #activePower{font-family:'Orbitron',monospace;font-size:18px;letter-spacing:4px;color:#fff;text-shadow:0 0 18px currentColor}
+  #gestureHint{margin-top:8px;font-size:12px;letter-spacing:2px;color:rgba(230,255,255,.62);line-height:1.6}
+  #manaWrap{height:5px;margin-top:14px;background:rgba(255,255,255,.12);overflow:hidden;box-shadow:0 0 20px rgba(56,247,255,.16)}
+  #mana{height:100%;width:0%;background:linear-gradient(90deg,var(--cyan),var(--violet),var(--magenta));box-shadow:0 0 18px var(--cyan);transition:width .22s}
+  #powers{position:absolute;right:26px;bottom:24px;display:grid;grid-template-columns:repeat(2,minmax(112px,1fr));gap:8px;pointer-events:all}
+  .powerBtn{height:38px;border:1px solid rgba(171,245,255,.34);background:rgba(4,12,30,.52);color:#eaffff;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:1.5px;cursor:pointer;backdrop-filter:blur(10px);box-shadow:inset 0 0 20px rgba(56,247,255,.06);transition:transform .16s,border-color .16s,background .16s}
+  .powerBtn:hover{transform:translateY(-1px);border-color:var(--cyan);background:rgba(56,247,255,.12)}
+  #start{position:absolute;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 45%,rgba(84,44,200,.24),rgba(2,4,13,.97) 58%);transition:opacity .6s}
+  #start.hidden{opacity:0;pointer-events:none}
+  .startInner{text-align:center;width:min(720px,calc(100vw - 34px));padding:32px}
+  .startInner h2{font-family:'Orbitron',monospace;font-size:clamp(34px,7vw,82px);line-height:.9;margin:0;color:#fff;letter-spacing:8px;text-shadow:0 0 24px var(--cyan),0 0 70px var(--violet)}
+  .startInner p{margin:24px auto 0;max-width:620px;color:rgba(230,255,255,.7);letter-spacing:2px;line-height:1.8;font-size:13px}
+  #startBtn{margin-top:30px;border:0;background:linear-gradient(90deg,var(--cyan),var(--violet));color:#02030a;font-family:'Orbitron',monospace;font-weight:900;letter-spacing:4px;padding:16px 42px;cursor:pointer;box-shadow:0 0 30px rgba(56,247,255,.65),0 0 80px rgba(156,92,255,.4);clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%)}
+  #startBtn:hover{filter:brightness(1.18)}
+  #error{min-height:22px;margin-top:18px;color:var(--red);letter-spacing:1.5px;font-size:11px}
+  .scanlines{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:.22;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(255,255,255,.05) 3px,transparent 5px)}
+  @media(max-width:720px){
+    #brand h1{font-size:19px;letter-spacing:3px}
+    #status{top:86px;left:28px;right:auto;text-align:left}
+    #powers{left:20px;right:20px;bottom:128px;grid-template-columns:repeat(3,1fr)}
+    .powerBtn{font-size:10px;height:34px}
+  }
 </style>
 </head>
 <body>
-
-<div id="start-overlay">
-  <div class="start-title">BIOFLOW<br>SCANNER</div>
-  <div class="start-sub">AI HOLOGRAPHIC BODY ANALYSIS SYSTEM<br>RAISE YOUR OPEN PALM TO INITIATE SCAN SEQUENCE</div>
-  <button class="start-btn" onclick="initSystem()">INITIALIZE</button>
-  <div class="start-warning">⚠ WEBCAM ACCESS REQUIRED — POINT PALM TOWARD CAMERA</div>
-  <div id="loading-bar"></div>
-</div>
-
 <video id="webcam" autoplay muted playsinline></video>
-<canvas id="canvas-bg"></canvas>
-<canvas id="canvas-scan"></canvas>
-<canvas id="canvas-hud"></canvas>
-<div class="scanline-overlay"></div>
+<div id="shade"></div>
+<canvas id="world"></canvas>
+<div class="scanlines"></div>
 
 <div id="ui">
-  <div class="corner corner-tl"></div>
-  <div class="corner corner-tr"></div>
-  <div class="corner corner-bl"></div>
-  <div class="corner corner-br"></div>
-  
-  <div id="title-bar">
-    <h1>BIOFLOW</h1>
-    <div class="sub">HOLOGRAPHIC SCAN SYSTEM v2.7</div>
+  <div id="brand">
+    <h1>REALITY<br>BENDER</h1>
+    <div class="tag">GESTURE POWER ENGINE</div>
   </div>
-  
-  <div id="status-panel">
-    <div class="label">System Status</div>
-    <div class="status-row"><div class="status-dot inactive" id="dot-cam"></div><span id="txt-cam">CAMERA — OFFLINE</span></div>
-    <div class="status-row"><div class="status-dot inactive" id="dot-hand"></div><span id="txt-hand">HAND TRACK — OFFLINE</span></div>
-    <div class="status-row"><div class="status-dot inactive" id="dot-scan"></div><span id="txt-scan">SCAN ENGINE — IDLE</span></div>
-    <div class="status-row"><div class="status-dot inactive" id="dot-ai"></div><span id="txt-ai">AI ANALYSIS — STANDBY</span></div>
+  <div id="status">
+    <div><span class="dot" id="camDot"></span><span id="camText">CAMERA OFFLINE</span></div>
+    <div style="margin-top:7px"><span class="dot" id="handDot"></span><span id="handText">HAND TRACKING WAITING</span></div>
   </div>
-  
-  <div id="data-panel">
-    <div class="data-row">SCAN FREQ <span class="data-val" id="d-freq">--</span> Hz</div>
-    <div class="data-row">HAND CONF <span class="data-val" id="d-conf">--</span>%</div>
-    <div class="data-row">PARTICLES <span class="data-val" id="d-part">--</span></div>
-    <div class="data-row">WAVE POS <span class="data-val" id="d-wave">--</span></div>
-    <div class="data-row">MODE <span class="data-val" id="d-mode">--</span></div>
+  <div id="powerReadout">
+    <div id="activePower">AWAITING SPARK</div>
+    <div id="gestureHint">Open palm: aura | Point: lightning | Pinch release: glitch | Two hands apart: portal | Grab: levitate | Clap: shockwave</div>
+    <div id="manaWrap"><div id="mana"></div></div>
   </div>
-  
-  <div id="gesture-panel">
-    <div class="gesture-chip" id="g-open">OPEN PALM → SCAN</div>
-    <div class="gesture-chip" id="g-swipe">SWIPE → MOVE</div>
-    <div class="gesture-chip" id="g-pinch">PINCH → ZOOM</div>
-    <div class="gesture-chip" id="g-two">2 HANDS → FULL</div>
-  </div>
-  
-  <div id="diagnostics">
-    <div class="diag-line"><span>BIO-SYNC</span><span id="diag-v1">--</span></div>
-    <div class="diag-bar"><div class="diag-fill" id="diag-b1" style="width:0%"></div></div>
-    <div class="diag-line"><span>NEURAL MAP</span><span id="diag-v2">--</span></div>
-    <div class="diag-bar"><div class="diag-fill" id="diag-b2" style="width:0%"></div></div>
-    <div class="diag-line"><span>ENERGY FIELD</span><span id="diag-v3">--</span></div>
-    <div class="diag-bar"><div class="diag-fill" id="diag-b3" style="width:0%"></div></div>
-    <div class="diag-line"><span>SIGNAL STR</span><span id="diag-v4">--</span></div>
-    <div class="diag-bar"><div class="diag-fill" id="diag-b4" style="width:0%"></div></div>
-  </div>
-  
-  <div id="scan-mode">
-    <div class="mode-label">SCAN MODES</div>
-    <div class="mode-item active" id="mode-1">▶ HOLOGRAPHIC</div>
-    <div class="mode-item" id="mode-2">  NEURAL MAP</div>
-    <div class="mode-item" id="mode-3">  WIREFRAME</div>
-    <div class="mode-item" id="mode-4">  PLASMA FIELD</div>
+  <div id="powers">
+    <button class="powerBtn" onclick="castPower('aura')">AURA</button>
+    <button class="powerBtn" onclick="castPower('lightning')">LIGHTNING</button>
+    <button class="powerBtn" onclick="castPower('glitch')">GLITCH</button>
+    <button class="powerBtn" onclick="castPower('portal')">PORTAL</button>
+    <button class="powerBtn" onclick="castPower('levitate')">LEVITATE</button>
+    <button class="powerBtn" onclick="castPower('shockwave')">SHOCKWAVE</button>
   </div>
 </div>
 
-<div id="fps-counter">FPS: <span id="fps">--</span></div>
+<div id="start">
+  <div class="startInner">
+    <h2>REALITY<br>BENDER</h2>
+    <p>Stand in front of your webcam and use your hands like a movie character. The buttons are test triggers; the real fun is the gesture engine.</p>
+    <button id="startBtn" onclick="initReality()">ENTER THE RIFT</button>
+    <div id="error"></div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
 
 <script>
-const W=window.innerWidth,H=window.innerHeight;
-const bgC=document.getElementById('canvas-bg');
-const scanC=document.getElementById('canvas-scan');
-const hudC=document.getElementById('canvas-hud');
-bgC.width=scanC.width=hudC.width=W;
-bgC.height=scanC.height=hudC.height=H;
-const bg=bgC.getContext('2d');
-const sc=scanC.getContext('2d');
-const hud=hudC.getContext('2d');
+const canvas=document.getElementById('world');
+const ctx=canvas.getContext('2d');
+const video=document.getElementById('webcam');
+let W=0,H=0,DPR=1;
+let hands=null,camera=null,started=false,demo=false;
+let handData=[],lastHandData=[];
+let particles=[],bolts=[],rings=[],portals=[],orbs=[],glitches=[],floatingObjects=[];
+let time=0,mana=0,flash=0,shake=0,lastPower='AWAITING SPARK';
+let pinchWas=false,grabWas=false,clapCooldown=0,lightningCooldown=0,portalCooldown=0;
 
-// ---- State ----
-let hands=null,camera=null,mediapipeReady=false;
-let handData=[],prevHandData=[];
-let scanActive=false,scanY=0,scanDir=1,scanSpeed=3;
-let scanPhase=0; // 0=idle 1=lock 2=wave 3=hologram 4=fadeout
-let scanTimer=0,lockTimer=0;
-let particles=[];
-let floatingTexts=[];
-let scanMode=0;
-const MODES=['HOLOGRAPHIC','NEURAL MAP','WIREFRAME','PLASMA FIELD'];
-const MODECOLORS=['#00f5ff','#ff00aa','#00ff88','#ff6600'];
-let currentModeColor='#00f5ff';
-let glowRings=[];
-let waveTrails=[];
-let ghostFrames=[];
-let lastGhostTime=0;
-let gestureState={open:false,pinch:false,swipe:false,dual:false};
-let fps=0,lastFpsTime=0,frameCount=0;
-let audioCtx=null;
-let diagValues=[0,0,0,0];
-let diagTargets=[0,0,0,0];
-let locked=false;
-let scanProgress=0;
-let screenFlash=0;
-let handConfidence=0;
-let gestureSnapCooldown=0;
-let initialized=false;
+const POWER_LABELS={
+  aura:'ENERGY AURA',
+  lightning:'LIGHTNING SHOT',
+  glitch:'REALITY GLITCH',
+  portal:'PORTAL OPENED',
+  levitate:'GRAVITY GRAB',
+  shockwave:'SHOCKWAVE'
+};
 
-// ---- Audio ----
-function initAudio(){
-  try{
-    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  }catch(e){}
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  W=window.innerWidth;H=window.innerHeight;
+  canvas.width=Math.round(W*DPR);canvas.height=Math.round(H*DPR);
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize',resize);
+resize();
+
+function setStatus(type,on,text,warn=false){
+  const dot=document.getElementById(type+'Dot');
+  const label=document.getElementById(type+'Text');
+  dot.className='dot '+(on?(warn?'warn':'on'):'');
+  label.textContent=text;
 }
 
-function playTone(freq,type,dur,vol=0.1,delay=0){
-  if(!audioCtx)return;
-  try{
-    const o=audioCtx.createOscillator();
-    const g=audioCtx.createGain();
-    o.connect(g);g.connect(audioCtx.destination);
-    o.type=type||'sine';o.frequency.setValueAtTime(freq,audioCtx.currentTime+delay);
-    g.gain.setValueAtTime(0,audioCtx.currentTime+delay);
-    g.gain.linearRampToValueAtTime(vol,audioCtx.currentTime+delay+0.02);
-    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+delay+dur);
-    o.start(audioCtx.currentTime+delay);
-    o.stop(audioCtx.currentTime+delay+dur);
-  }catch(e){}
-}
-
-function playScanCharge(){
-  playTone(80,'sawtooth',0.5,0.08);
-  playTone(160,'sine',0.3,0.05,0.1);
-  playTone(320,'sine',0.2,0.05,0.2);
-  playTone(640,'sine',0.15,0.04,0.35);
-}
-function playLockOn(){
-  playTone(880,'square',0.1,0.06);
-  playTone(1100,'square',0.1,0.06,0.1);
-  playTone(1320,'sine',0.2,0.07,0.2);
-}
-function playWaveSound(){
-  playTone(220,'sawtooth',0.4,0.05);
-  playTone(110,'sine',0.5,0.08);
-}
-function playHologramReveal(){
-  for(let i=0;i<5;i++)playTone(440+i*80,'sine',0.3,0.05,i*0.08);
-  playTone(60,'sawtooth',0.5,0.1);
-}
-function playSnapSound(){
-  playTone(2000,'square',0.05,0.15);
-  playTone(1500,'square',0.05,0.1,0.05);
-}
-
-// ---- Particles ----
-function spawnParticle(x,y,opts={}){
-  particles.push({
-    x,y,
-    vx:(Math.random()-0.5)*(opts.spread||4),
-    vy:(Math.random()-0.5)*(opts.spread||4)-(opts.rise||0),
-    life:1,
-    decay:opts.decay||0.015,
-    size:opts.size||2,
-    color:opts.color||currentModeColor,
-    type:opts.type||'circle',
-    trail:opts.trail||false,
-    gravity:opts.gravity||0
-  });
-}
-
-function spawnBurst(x,y,count=20,opts={}){
-  for(let i=0;i<count;i++)spawnParticle(x,y,opts);
-}
-
-// ---- Floating Texts ----
-function spawnText(text,x,y,color='#00f5ff'){
-  floatingTexts.push({text,x,y,life:1,vy:-0.8,color,size:11});
-}
-
-// ---- Ring system ----
-function spawnRing(x,y,opts={}){
-  glowRings.push({
-    x,y,r:opts.r||10,maxR:opts.maxR||80,
-    speed:opts.speed||3,life:1,decay:opts.decay||0.015,
-    color:opts.color||currentModeColor,
-    lineWidth:opts.lw||2
-  });
-}
-
-// ---- Init System ----
-async function initSystem(){
-  initAudio();
-  const overlay=document.getElementById('start-overlay');
-  const bar=document.getElementById('loading-bar');
-  const warning=document.querySelector('.start-warning');
-  
-  // Animate loading
-  let prog=0;
-  const loadInterval=setInterval(()=>{
-    prog+=Math.random()*15;
-    if(prog>100)prog=100;
-    bar.style.width=prog+'%';
-  },150);
-  
+async function initReality(){
+  document.getElementById('error').textContent='';
   try{
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-      throw new Error('Camera access requires Live Server on localhost or HTTPS.');
+      throw new Error('Use Live Server on localhost or HTTPS for webcam access.');
     }
-
-    const stream=await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720,facingMode:'user'}});
-    const vid=document.getElementById('webcam');
-    vid.srcObject=stream;
-    await vid.play();
-    vid.classList.add('visible');
-    
-    setStatus('cam',true,'CAMERA — ACTIVE');
-    
-    clearInterval(loadInterval);
-    bar.style.width='100%';
-    
-    setTimeout(()=>{
-      overlay.classList.add('hidden');
-      initialized=true;
-      initMediaPipe();
-      startRenderLoop();
-      startDiagnostics();
-    },800);
-    
+    const stream=await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720,facingMode:'user'},audio:false});
+    video.srcObject=stream;
+    await video.play();
+    video.classList.add('visible');
+    setStatus('cam',true,'CAMERA LINKED');
+    document.getElementById('start').classList.add('hidden');
+    started=true;
+    initHands();
+    loop();
   }catch(e){
-    console.error('Camera initialization failed:',e);
-    clearInterval(loadInterval);
-    bar.style.background='#ff3355';
-    bar.style.width='100%';
-    warning.classList.add('error');
-    warning.textContent='CAMERA FAILED: '+(e.name||'Error')+' - '+(e.message||'Check browser permission and use http://localhost or http://127.0.0.1.');
-    setStatus('cam',false,'CAMERA - ERROR');
-    // Demo mode without webcam
-    setTimeout(()=>{
-      overlay.classList.add('hidden');
-      initialized=true;
-      startRenderLoop();
-      startDemoMode();
-      startDiagnostics();
-    },1000);
+    document.getElementById('error').textContent='Camera failed: '+(e.message||e.name||'permission blocked')+'. Demo mode started.';
+    setStatus('cam',true,'DEMO REALITY',true);
+    setStatus('hand',true,'SIMULATED HANDS',true);
+    demo=true;
+    document.getElementById('start').classList.add('hidden');
+    started=true;
+    loop();
   }
 }
 
-function setStatus(key,active,text,warn=false){
-  const dot=document.getElementById('dot-'+key);
-  const txt=document.getElementById('txt-'+key);
-  dot.className='status-dot'+(active?(warn?' warn':''):'  inactive');
-  txt.textContent=text;
-}
-
-// ---- MediaPipe ----
-function initMediaPipe(){
+function initHands(){
   try{
-    hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
-    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:0.7,minTrackingConfidence:0.5});
-    hands.onResults(onHandResults);
-    
-    const vid=document.getElementById('webcam');
-    camera=new Camera(vid,{
-      onFrame:async()=>{
-        if(hands)await hands.send({image:vid});
-      },
-      width:1280,height:720
-    });
+    hands=new Hands({locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+    hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.68,minTrackingConfidence:.55});
+    hands.onResults(onHands);
+    camera=new Camera(video,{onFrame:async()=>{if(hands)await hands.send({image:video});},width:1280,height:720});
     camera.start();
-    
-    mediapipeReady=true;
-    setStatus('hand',true,'HAND TRACK — ACTIVE');
-    setStatus('ai',true,'AI ANALYSIS — ACTIVE');
-    
+    setStatus('hand',true,'HAND TRACKING ACTIVE');
   }catch(e){
-    setStatus('hand',false,'HAND TRACK — ERROR');
-    startDemoMode();
+    setStatus('hand',true,'SIMULATED HANDS',true);
+    demo=true;
   }
 }
 
-function onHandResults(results){
-  prevHandData=[...handData];
-  handData=[];
-  
-  if(!results.multiHandLandmarks||results.multiHandLandmarks.length===0){
-    if(scanPhase>0&&scanPhase<4){
-      // Hand lost — gradually fade
-    }
-    gestureState={open:false,pinch:false,swipe:false,dual:false};
-    updateGestureUI();
-    document.getElementById('d-conf').textContent='--';
-    return;
+function onHands(results){
+  lastHandData=handData;
+  handData=results.multiHandLandmarks?results.multiHandLandmarks:[];
+  if(handData.length===0){
+    setStatus('hand',true,'SHOW YOUR HAND',true);
+  }else{
+    setStatus('hand',true,handData.length===1?'ONE HAND LOCKED':'TWO HANDS LOCKED');
   }
-  
-  for(let i=0;i<results.multiHandLandmarks.length;i++){
-    const lm=results.multiHandLandmarks[i];
-    handData.push(lm);
-  }
-  
-  if(handData.length>0) processGestures();
+}
+
+function screenPoint(lm,i){
+  return {x:(1-lm[i].x)*W,y:lm[i].y*H,z:lm[i].z||0};
+}
+
+function distance(a,b){
+  return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+function handMetrics(lm){
+  const wrist=screenPoint(lm,0);
+  const index=screenPoint(lm,8);
+  const indexPip=screenPoint(lm,6);
+  const middle=screenPoint(lm,12);
+  const ring=screenPoint(lm,16);
+  const pinky=screenPoint(lm,20);
+  const thumb=screenPoint(lm,4);
+  const palm=screenPoint(lm,9);
+  const tips=[8,12,16,20].map(i=>screenPoint(lm,i));
+  const pips=[6,10,14,18].map(i=>screenPoint(lm,i));
+  let extended=0;
+  for(let i=0;i<4;i++)if(tips[i].y<pips[i].y)extended++;
+  const pinch=distance(thumb,index)<42;
+  const point=tips[0].y<pips[0].y&&tips[1].y>pips[1].y&&tips[2].y>pips[2].y&&tips[3].y>pips[3].y;
+  const open=extended>=3;
+  const grab=extended<=1&&!pinch;
+  return {wrist,index,indexPip,middle,ring,pinky,thumb,palm,tips,pips,extended,pinch,point,open,grab};
 }
 
 function processGestures(){
+  if(demo){
+    const cx=W/2+Math.cos(time*.8)*W*.18;
+    const cy=H*.52+Math.sin(time*.6)*H*.12;
+    const fake=generateFakeHand(cx,cy);
+    handData=[fake];
+  }
   if(handData.length===0)return;
-  const lm=handData[0];
-  
-  // Mirror x (webcam is mirrored)
-  const pt=(i)=>({x:(1-lm[i].x)*W, y:lm[i].y*H, z:lm[i].z});
-  
-  // Confidence proxy from wrist to middle finger distance
-  const wrist=pt(0);
-  const mid=pt(9);
-  const dist=Math.hypot(mid.x-wrist.x,mid.y-wrist.y);
-  handConfidence=Math.min(100,Math.round(dist/2));
-  document.getElementById('d-conf').textContent=handConfidence;
-  
-  // Open palm detection: all fingers extended
-  const fingerTips=[8,12,16,20];
-  const fingerPips=[6,10,14,18];
-  let extended=0;
-  for(let i=0;i<4;i++){
-    if(pt(fingerTips[i]).y < pt(fingerPips[i]).y) extended++;
+
+  const first=handMetrics(handData[0]);
+  mana=Math.min(100,mana+(first.open?1.7:.35));
+  if(first.open){
+    setPower('aura');
+    aura(first.palm,first.tips);
   }
-  const wasOpen=gestureState.open;
-  gestureState.open=extended>=3;
-  
-  // Pinch
-  const thumb=pt(4);
-  const index=pt(8);
-  const pinchDist=Math.hypot(thumb.x-index.x,thumb.y-index.y);
-  gestureState.pinch=pinchDist<40;
-  
-  // Dual hand
-  gestureState.dual=handData.length>=2;
-  
-  // Snap (pinch then quick release)
-  if(gestureSnapCooldown<=0&&!gestureState.pinch&&pinchDist<60&&extended>=3){
-    // potential snap
+  if(first.point&&lightningCooldown<=0){
+    castLightning(first.index,projectDirection(first.indexPip,first.index));
+    lightningCooldown=18;
   }
-  gestureSnapCooldown=Math.max(0,gestureSnapCooldown-1);
-  
-  updateGestureUI();
-  
-  // Trigger scan on open palm
-  if(gestureState.open&&!wasOpen&&scanPhase===0){
-    triggerScan(pt(9).x,pt(9).y);
+  if(pinchWas&&!first.pinch){
+    castPower('glitch',first.palm);
   }
-  
-  // Dual hand = full body mode
-  if(gestureState.dual&&scanPhase===0){
-    scanSpeed=5;
-    triggerScan(W/2,H/2);
+  if(first.grab&&!grabWas){
+    castPower('levitate',first.palm);
   }
-  
-  // Pinch to zoom effect
-  if(gestureState.pinch&&scanPhase===2){
-    spawnBurst(thumb.x,thumb.y,5,{spread:3,decay:0.03,size:2,color:'#ff00aa'});
+  if(first.grab){
+    pullObjects(first.palm);
   }
-  
-  // Palm particles always when hand visible
-  if(gestureState.open){
-    const palm=pt(9);
-    for(let i=0;i<5;i++){
-      spawnParticle(palm.x+Math.random()*40-20,palm.y+Math.random()*40-20,{
-        spread:2,rise:1,decay:0.03,size:Math.random()*3+1,
-        color:currentModeColor,trail:true
-      });
+  pinchWas=first.pinch;
+  grabWas=first.grab;
+
+  if(handData.length>1){
+    const second=handMetrics(handData[1]);
+    const d=distance(first.palm,second.palm);
+    if(d>210&&portalCooldown<=0){
+      castPortal(midpoint(first.palm,second.palm),d);
+      portalCooldown=40;
     }
-    
-    // Fingertip particles
-    [4,8,12,16,20].forEach(ti=>{
-      const tp=pt(ti);
-      if(Math.random()<0.4)spawnParticle(tp.x,tp.y,{spread:3,rise:2,decay:0.025,size:2,color:currentModeColor});
-    });
-  }
-  
-  // Swipe detection
-  if(prevHandData.length>0){
-    const prevPt=(i)=>({x:(1-prevHandData[0][i].x)*W,y:prevHandData[0][i].y*H});
-    const dx=pt(9).x-prevPt(9).x;
-    gestureState.swipe=Math.abs(dx)>15;
-    if(gestureState.swipe&&scanPhase===2){
-      scanY=pt(9).y;
+    if(d<95&&clapCooldown<=0){
+      castPower('shockwave',midpoint(first.palm,second.palm));
+      clapCooldown=70;
     }
   }
-  
-  // Mode snap — pinch + release
-  if(gestureState.pinch&&gestureSnapCooldown<=0){
-    cycleScanMode();
-    gestureSnapCooldown=60;
-    playSnapSound();
+
+  lightningCooldown=Math.max(0,lightningCooldown-1);
+  portalCooldown=Math.max(0,portalCooldown-1);
+  clapCooldown=Math.max(0,clapCooldown-1);
+}
+
+function midpoint(a,b){
+  return {x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+}
+
+function projectDirection(base,tip){
+  const dx=tip.x-base.x,dy=tip.y-base.y;
+  const len=Math.hypot(dx,dy)||1;
+  return {x:dx/len,y:dy/len};
+}
+
+function setPower(key){
+  lastPower=POWER_LABELS[key]||key;
+  document.getElementById('activePower').textContent=lastPower;
+  document.getElementById('activePower').style.color=colorFor(key);
+}
+
+function colorFor(key){
+  return {aura:'#38f7ff',lightning:'#ffd36a',glitch:'#ff3df2',portal:'#9c5cff',levitate:'#4dff9d',shockwave:'#ff4c6a'}[key]||'#fff';
+}
+
+function castPower(key,origin){
+  origin=origin||{x:W/2,y:H/2};
+  setPower(key);
+  mana=Math.min(100,mana+18);
+  if(key==='aura')rings.push({x:origin.x,y:origin.y,r:20,v:5,life:1,color:colorFor(key),thick:4});
+  if(key==='lightning')castLightning(origin,{x:0,y:-1});
+  if(key==='glitch')castGlitch(origin);
+  if(key==='portal')castPortal(origin,280);
+  if(key==='levitate')spawnObjects(origin);
+  if(key==='shockwave')castShockwave(origin);
+}
+
+function castLightning(origin,dir){
+  setPower('lightning');
+  flash=Math.max(flash,.22);
+  const end={x:origin.x+dir.x*W*.55,y:origin.y+dir.y*H*.55};
+  bolts.push({points:jaggedLine(origin,end,18,34),life:1,width:6,color:'#ffd36a'});
+  bolts.push({points:jaggedLine(origin,end,12,18),life:.85,width:2,color:'#ffffff'});
+  for(let i=0;i<28;i++)particle(origin.x,origin.y,'#ffd36a',6,1.4);
+  rings.push({x:end.x,y:end.y,r:4,v:8,life:1,color:'#ffd36a',thick:3});
+}
+
+function jaggedLine(a,b,steps,amp){
+  const pts=[];
+  const dx=b.x-a.x,dy=b.y-a.y;
+  const len=Math.hypot(dx,dy)||1;
+  const nx=-dy/len,ny=dx/len;
+  for(let i=0;i<=steps;i++){
+    const t=i/steps;
+    const wobble=(Math.random()-.5)*amp*(1-Math.abs(t-.5));
+    pts.push({x:a.x+dx*t+nx*wobble,y:a.y+dy*t+ny*wobble});
+  }
+  return pts;
+}
+
+function castGlitch(origin){
+  setPower('glitch');
+  shake=16;
+  flash=Math.max(flash,.35);
+  glitches.push({life:1});
+  for(let i=0;i<24;i++){
+    particles.push({x:origin.x+(Math.random()-.5)*160,y:origin.y+(Math.random()-.5)*120,vx:(Math.random()-.5)*18,vy:(Math.random()-.5)*4,life:1,decay:.045,size:2+Math.random()*12,color:Math.random()>.5?'#ff3df2':'#38f7ff',shape:'rect'});
   }
 }
 
-function updateGestureUI(){
-  document.getElementById('g-open').className='gesture-chip'+(gestureState.open?' active':'');
-  document.getElementById('g-swipe').className='gesture-chip'+(gestureState.swipe?' active':'');
-  document.getElementById('g-pinch').className='gesture-chip'+(gestureState.pinch?' active':'');
-  document.getElementById('g-two').className='gesture-chip'+(gestureState.dual?' active':'');
+function castPortal(origin,spread){
+  setPower('portal');
+  portals.push({x:origin.x,y:origin.y,r:Math.max(72,Math.min(spread*.42,190)),rot:0,life:1});
+  flash=Math.max(flash,.16);
+  for(let i=0;i<50;i++){
+    const a=Math.random()*Math.PI*2;
+    const r=40+Math.random()*spread*.35;
+    particle(origin.x+Math.cos(a)*r,origin.y+Math.sin(a)*r,'#9c5cff',8,1.1,{tx:origin.x,ty:origin.y});
+  }
 }
 
-function cycleScanMode(){
-  scanMode=(scanMode+1)%MODES.length;
-  currentModeColor=MODECOLORS[scanMode];
-  document.getElementById('d-mode').textContent=MODES[scanMode];
-  document.querySelectorAll('.mode-item').forEach((el,i)=>{
-    el.className='mode-item'+(i===scanMode?' active':'');
-    el.textContent=(i===scanMode?'▶ ':' ')+MODES[i];
+function spawnObjects(origin){
+  setPower('levitate');
+  for(let i=0;i<7;i++){
+    floatingObjects.push({x:origin.x+(Math.random()-.5)*260,y:origin.y+80+Math.random()*120,vx:(Math.random()-.5)*1.2,vy:-2-Math.random()*2,size:18+Math.random()*36,rot:Math.random()*Math.PI,spin:(Math.random()-.5)*.05,life:1,color:i%2?'#4dff9d':'#38f7ff'});
+  }
+  rings.push({x:origin.x,y:origin.y,r:20,v:3.5,life:1,color:'#4dff9d',thick:2});
+}
+
+function pullObjects(origin){
+  if(floatingObjects.length<4&&Math.random()<.08)spawnObjects(origin);
+  floatingObjects.forEach(o=>{
+    o.vx+=(origin.x-o.x)*.0007;
+    o.vy+=(origin.y-o.y)*.0007-.015;
   });
 }
 
-// ---- Demo Mode (no webcam) ----
-let demoAngle=0;
-function startDemoMode(){
-  setStatus('cam',true,'CAMERA — DEMO MODE','warn');
-  setStatus('hand',true,'HAND TRACK — SIMULATED','warn');
-  setStatus('ai',true,'AI ANALYSIS — DEMO','warn');
-  
-  setInterval(()=>{
-    if(scanPhase===0){
-      demoAngle+=0.03;
-      const x=W/2+Math.cos(demoAngle)*150;
-      const y=H/2+Math.sin(demoAngle)*100;
-      handData=[generateFakeHand(x,y)];
-      gestureState.open=true;
-      handConfidence=92;
-      document.getElementById('d-conf').textContent=92;
-      
-      if(Math.random()<0.01) triggerScan(x,y);
-    }
-  },50);
+function castShockwave(origin){
+  setPower('shockwave');
+  shake=24;
+  flash=Math.max(flash,.45);
+  rings.push({x:origin.x,y:origin.y,r:10,v:18,life:1,color:'#ff4c6a',thick:7});
+  rings.push({x:origin.x,y:origin.y,r:30,v:10,life:.8,color:'#ffd36a',thick:3});
+  for(let i=0;i<130;i++)particle(origin.x,origin.y,i%3?'#ff4c6a':'#ffd36a',14,1.8);
+}
+
+function aura(palm,tips){
+  rings.push({x:palm.x,y:palm.y,r:30+Math.sin(time*5)*5,v:1.2,life:.28,color:'#38f7ff',thick:2});
+  for(let i=0;i<5;i++){
+    const t=tips[i]||palm;
+    particle(t.x,t.y,i%2?'#38f7ff':'#9c5cff',3,.72);
+  }
+  orbs.push({x:palm.x,y:palm.y,r:62+Math.sin(time*4)*8,life:.18,color:'#38f7ff'});
+}
+
+function particle(x,y,color,speed=4,life=1,extra={}){
+  const a=Math.random()*Math.PI*2;
+  const v=Math.random()*speed;
+  particles.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,life,decay:.018+Math.random()*.018,size:1+Math.random()*4,color,shape:'circle',...extra});
 }
 
 function generateFakeHand(cx,cy){
-  // 21 landmarks for a hand
-  const lm=[];
-  // Rough hand layout
-  const pts=[
-    [0,0],[0.1,-0.2],[0.2,-0.35],[0.3,-0.45],[0.35,-0.55], // thumb
-    [0.05,-0.3],[0.05,-0.5],[0.05,-0.65],[0.05,-0.78],
-    [-0.05,-0.3],[-0.05,-0.5],[-0.05,-0.65],[-0.05,-0.77],
-    [-0.15,-0.28],[-0.15,-0.46],[-0.15,-0.6],[-0.15,-0.72],
-    [-0.25,-0.22],[-0.25,-0.38],[-0.25,-0.5],[-0.25,-0.6]
-  ];
-  const scale=0.12;
-  pts.forEach(p=>{
-    lm.push({x:(cx/W)+p[0]*scale,y:(cy/H)+p[1]*scale,z:0});
-  });
-  return lm;
+  const pts=[[0,0],[.08,-.16],[.18,-.26],[.28,-.34],[.4,-.42],[.06,-.25],[.08,-.47],[.09,-.66],[.1,-.84],[-.04,-.27],[-.04,-.52],[-.04,-.72],[-.04,-.91],[-.14,-.24],[-.17,-.46],[-.19,-.64],[-.2,-.8],[-.24,-.18],[-.31,-.35],[-.36,-.5],[-.4,-.64]];
+  return pts.map(p=>({x:cx/W+p[0]*.12,y:cy/H+p[1]*.12,z:0}));
 }
 
-// ---- Scan Trigger ----
-function triggerScan(x,y){
-  if(scanPhase!==0)return;
-  scanPhase=1; // Lock on
-  lockTimer=60;
-  scanY=y;
-  playScanCharge();
-  setStatus('scan',true,'SCAN ENGINE — LOCKING');
-  screenFlash=0.3;
-  
-  // Spawn lock rings
-  for(let i=0;i<3;i++){
-    setTimeout(()=>spawnRing(x,y,{r:20,maxR:80,speed:2,decay:0.012,color:currentModeColor,lw:2}),i*100);
-  }
-  spawnBurst(x,y,30,{spread:6,decay:0.02,size:2,color:currentModeColor});
-  
-  setTimeout(()=>{
-    playLockOn();
-    spawnText('LOCK-ON ACQUIRED',x-80,y-100);
-    spawnText('INITIATING SCAN...',x-70,y-80);
-    setTimeout(()=>beginScanWave(),500);
-  },1500);
-}
-
-function beginScanWave(){
-  scanPhase=2;
-  scanY=0;
-  scanDir=1;
-  scanProgress=0;
-  playWaveSound();
-  setStatus('scan',true,'SCAN ENGINE — ACTIVE');
-  document.getElementById('d-wave').textContent='SCANNING';
-  screenFlash=0.5;
-  
-  // Floating diagnostics
-  const msgs=['BIOMASS: DETECTED','NEURAL NET: MAPPING','FREQUENCY: 2.4GHz','SYNC RATE: 97.3%'];
-  msgs.forEach((m,i)=>setTimeout(()=>spawnText(m,Math.random()*W*0.6+W*0.2,H/2+Math.random()*200-100),i*300));
-}
-
-// ---- Render Loop ----
-let lastTime=0;
-function startRenderLoop(){
-  function frame(t){
-    const dt=t-lastTime;lastTime=t;
-    
-    // FPS
-    frameCount++;
-    if(t-lastFpsTime>1000){
-      fps=frameCount;frameCount=0;lastFpsTime=t;
-      document.getElementById('fps').textContent=fps;
-    }
-    
-    drawBackground();
-    updateParticles();
-    drawParticles();
-    updateRings();
-    drawRings();
-    updateScanWave(dt);
-    drawHUD();
-    drawFloatingTexts();
-    
-    if(initialized)requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
-}
-
-// ---- Background ----
-let bgStars=Array.from({length:150},()=>({x:Math.random()*W,y:Math.random()*H,s:Math.random()*1.5,t:Math.random()*Math.PI*2}));
-let bgTime=0;
 function drawBackground(){
-  bg.clearRect(0,0,W,H);
-  bgTime+=0.01;
-  
-  // Stars
-  bgStars.forEach(s=>{
-    s.t+=0.02;
-    const alpha=0.2+0.15*Math.sin(s.t);
-    bg.fillStyle=`rgba(0,245,255,${alpha})`;
-    bg.fillRect(s.x,s.y,s.s,s.s);
-  });
-  
-  // Grid lines
-  bg.strokeStyle='rgba(0,80,120,0.15)';
-  bg.lineWidth=0.5;
-  const gridSz=80;
-  for(let x=0;x<W;x+=gridSz){
-    bg.beginPath();bg.moveTo(x,0);bg.lineTo(x,H);bg.stroke();
-  }
-  for(let y=0;y<H;y+=gridSz){
-    bg.beginPath();bg.moveTo(0,y);bg.lineTo(W,y);bg.stroke();
-  }
-  
-  // Center glow
-  if(scanPhase>0){
-    const gr=bg.createRadialGradient(W/2,H/2,0,W/2,H/2,400);
-    const alpha=0.06*Math.sin(bgTime*2+1)*Math.sin(bgTime*3);
-    gr.addColorStop(0,`rgba(0,100,200,${Math.abs(alpha)+0.02})`);
-    gr.addColorStop(1,'rgba(0,0,0,0)');
-    bg.fillStyle=gr;
-    bg.fillRect(0,0,W,H);
-  }
-  
-  // Screen flash
-  if(screenFlash>0){
-    bg.fillStyle=`rgba(0,245,255,${screenFlash*0.15})`;
-    bg.fillRect(0,0,W,H);
-    screenFlash*=0.9;
-  }
-}
-
-// ---- Scan Wave ----
-let hologramAlpha=0;
-let hologramData=null;
-let ghostAlpha=0;
-
-function updateScanWave(dt){
-  if(scanPhase===2){
-    scanProgress+=scanSpeed/H;
-    scanY=scanProgress*H;
-    
-    // Wave trails
-    waveTrails.push({y:scanY,alpha:0.8,time:Date.now()});
-    if(waveTrails.length>40)waveTrails.shift();
-    
-    // Spawn particles along wave
-    for(let x=0;x<W;x+=30){
-      if(Math.random()<0.3){
-        spawnParticle(x+Math.random()*30,scanY,{
-          spread:2,decay:0.02,size:Math.random()*3+1,
-          color:currentModeColor,rise:0.5,trail:true
-        });
-      }
-    }
-    
-    // Spawn floating diagnostics at intervals
-    if(Math.random()<0.01){
-      const diagMsgs=['SYN:'+Math.round(Math.random()*100)+'%','TMP:37.'+Math.round(Math.random()*9)+'°C',
-        'HRV:'+Math.round(Math.random()*20+60),'BPM:'+Math.round(Math.random()*20+65),
-        'O2:'+Math.round(Math.random()*5+95)+'%','FRQ:'+Math.round(Math.random()*9+440)+'Hz'];
-      const msg=diagMsgs[Math.floor(Math.random()*diagMsgs.length)];
-      spawnText(msg,Math.random()*W*0.8+W*0.1,scanY+Math.random()*60-30);
-    }
-    
-    document.getElementById('d-wave').textContent=Math.round(scanProgress*100)+'%';
-    
-    if(scanProgress>=1){
-      // Wave complete — hologram phase
-      scanPhase=3;
-      hologramAlpha=0;
-      ghostAlpha=1;
-      playHologramReveal();
-      setStatus('scan',true,'SCAN ENGINE — COMPLETE');
-      screenFlash=0.8;
-      
-      spawnBurst(W/2,H/2,80,{spread:10,decay:0.008,size:3,color:currentModeColor,trail:true});
-      spawnText('SCAN COMPLETE',W/2-70,H/2-30,currentModeColor);
-      spawnText('ANALYZING BIOFIELD...',W/2-90,H/2);
-      
-      setTimeout(()=>{
-        scanPhase=4; // Fade out
-        setTimeout(resetScan,4000);
-      },3000);
-    }
-  }
-  
-  // Fade hologram
-  if(scanPhase===3){
-    hologramAlpha=Math.min(1,hologramAlpha+0.02);
-    ghostAlpha=Math.max(0,ghostAlpha-0.005);
-  }
-  if(scanPhase===4){
-    hologramAlpha=Math.max(0,hologramAlpha-0.01);
-    ghostAlpha=Math.max(0,ghostAlpha-0.01);
-  }
-  
-  drawScanEffects();
-}
-
-function drawScanEffects(){
-  sc.clearRect(0,0,W,H);
-  
-  if(scanPhase===0)return;
-  
-  // Lock-on phase
-  if(scanPhase===1){
-    lockTimer=Math.max(0,lockTimer-1);
-    // Animated target crosshair at first hand position
-    if(handData.length>0){
-      const lm=handData[0];
-      const px=(1-lm[9].x)*W;
-      const py=lm[9].y*H;
-      drawCrosshair(sc,px,py,lockTimer);
-    }
-  }
-  
-  // Wave phase
-  if(scanPhase===2){
-    // The main scan wave line
-    const waveGrad=sc.createLinearGradient(0,scanY-50,0,scanY+50);
-    waveGrad.addColorStop(0,'rgba(0,0,0,0)');
-    waveGrad.addColorStop(0.4,currentModeColor+'33');
-    waveGrad.addColorStop(0.5,currentModeColor+'ff');
-    waveGrad.addColorStop(0.6,currentModeColor+'33');
-    waveGrad.addColorStop(1,'rgba(0,0,0,0)');
-    
-    sc.fillStyle=waveGrad;
-    sc.fillRect(0,scanY-50,W,100);
-    
-    // Wave line with plasma effect
-    sc.save();
-    sc.beginPath();
-    sc.moveTo(0,scanY);
-    for(let x=0;x<=W;x+=5){
-      const noise=Math.sin(x*0.05+bgTime*5)*8+Math.sin(x*0.02+bgTime*3)*5;
-      sc.lineTo(x,scanY+noise);
-    }
-    sc.strokeStyle=currentModeColor;
-    sc.lineWidth=3;
-    sc.shadowColor=currentModeColor;
-    sc.shadowBlur=20;
-    sc.stroke();
-    sc.restore();
-    
-    // Wave trails
-    waveTrails.forEach((tr,i)=>{
-      const age=(Date.now()-tr.time)/2000;
-      const alpha=Math.max(0,tr.alpha*(1-age));
-      sc.strokeStyle=currentModeColor+(Math.round(alpha*60).toString(16).padStart(2,'0'));
-      sc.lineWidth=1;
-      sc.beginPath();sc.moveTo(0,tr.y);sc.lineTo(W,tr.y);sc.stroke();
-    });
-    
-    // Scanned region overlay — holographic tint
-    if(scanMode===0){
-      const grad=sc.createLinearGradient(0,0,0,scanY);
-      grad.addColorStop(0,currentModeColor+'08');
-      grad.addColorStop(1,currentModeColor+'18');
-      sc.fillStyle=grad;
-      sc.fillRect(0,0,W,scanY);
-    }else if(scanMode===1){
-      // Neural map — purple tint
-      const grad=sc.createLinearGradient(0,0,0,scanY);
-      grad.addColorStop(0,'rgba(139,0,255,0.05)');
-      grad.addColorStop(1,'rgba(255,0,170,0.12)');
-      sc.fillStyle=grad;
-      sc.fillRect(0,0,W,scanY);
-    }else if(scanMode===2){
-      // Wireframe — draw grid overlay
-      sc.strokeStyle='rgba(0,255,136,0.15)';
-      sc.lineWidth=0.5;
-      for(let x=0;x<W;x+=40){sc.beginPath();sc.moveTo(x,0);sc.lineTo(x,scanY);sc.stroke();}
-      for(let y=0;y<scanY;y+=40){sc.beginPath();sc.moveTo(0,y);sc.lineTo(W,y);sc.stroke();}
-    }else if(scanMode===3){
-      // Plasma — wavy colored overlay
-      sc.save();
-      for(let y=0;y<scanY;y+=8){
-        const hue=(y*2+bgTime*50)%360;
-        sc.strokeStyle=`hsla(${hue},100%,60%,0.08)`;
-        sc.lineWidth=4;
-        sc.beginPath();sc.moveTo(0,y);
-        for(let x=0;x<W;x+=4){
-          sc.lineTo(x,y+Math.sin(x*0.05+bgTime*3+y*0.02)*6);
-        }
-        sc.stroke();
-      }
-      sc.restore();
-    }
-    
-    // Scanlines
-    sc.save();
-    for(let y=0;y<scanY;y+=4){
-      sc.strokeStyle='rgba(0,0,0,0.08)';
-      sc.lineWidth=1;
-      sc.beginPath();sc.moveTo(0,y);sc.lineTo(W,y);sc.stroke();
-    }
-    sc.restore();
-    
-    // Distortion ripple at wave front
-    drawRipple(sc,W/2,scanY,scanProgress);
-  }
-  
-  // Hologram phase
-  if(scanPhase>=3&&hologramAlpha>0){
-    // Holographic full-screen tint
-    sc.save();
-    sc.globalAlpha=hologramAlpha*0.15;
-    const hgr=sc.createLinearGradient(0,0,0,H);
-    hgr.addColorStop(0,currentModeColor+'40');
-    hgr.addColorStop(0.5,'rgba(0,0,40,0)');
-    hgr.addColorStop(1,currentModeColor+'40');
-    sc.fillStyle=hgr;
-    sc.fillRect(0,0,W,H);
-    sc.restore();
-    
-    // Animated scanlines over whole screen
-    sc.save();
-    sc.globalAlpha=hologramAlpha*0.04;
-    for(let y=0;y<H;y+=3){
-      sc.fillStyle=y%6===0?currentModeColor:'rgba(0,0,0,0)';
-      sc.fillRect(0,y,W,1);
-    }
-    sc.restore();
-    
-    // Skeleton wireframe overlay (body silhouette)
-    if(scanMode===0||scanMode===2){
-      drawWireframeBody(sc,hologramAlpha);
-    }
-    if(scanMode===1){
-      drawNeuralOverlay(sc,hologramAlpha);
-    }
-    if(scanMode===3){
-      drawPlasmaBody(sc,hologramAlpha);
-    }
-  }
-}
-
-function drawCrosshair(ctx,x,y,anim){
-  const r=40+Math.sin(bgTime*5)*5;
-  const rot=bgTime*2;
+  ctx.clearRect(0,0,W,H);
+  const sx=(Math.random()-.5)*shake;
+  const sy=(Math.random()-.5)*shake;
   ctx.save();
-  ctx.translate(x,y);
-  ctx.rotate(rot);
-  ctx.strokeStyle=currentModeColor;
-  ctx.lineWidth=2;
-  ctx.shadowColor=currentModeColor;
-  ctx.shadowBlur=15;
-  
-  // Outer rotating square
-  ctx.beginPath();
-  ctx.rect(-r,-r,r*2,r*2);
-  ctx.stroke();
-  
-  // Corner ticks
-  const cs=15;
-  [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sy])=>{
-    ctx.beginPath();
-    ctx.moveTo(sx*r,sy*r);ctx.lineTo(sx*r-sx*cs,sy*r);
-    ctx.moveTo(sx*r,sy*r);ctx.lineTo(sx*r,sy*r-sy*cs);
-    ctx.stroke();
-  });
-  
-  // Inner spinning circle
-  ctx.rotate(-rot*2);
-  ctx.beginPath();
-  ctx.arc(0,0,r*0.5,0,Math.PI*2*0.75);
-  ctx.stroke();
-  
-  ctx.restore();
-}
-
-function drawRipple(ctx,x,y,progress){
-  const maxR=200;
-  const r=progress*maxR*2%maxR;
-  ctx.save();
-  ctx.strokeStyle=currentModeColor+'80';
-  ctx.lineWidth=2;
-  ctx.shadowColor=currentModeColor;
-  ctx.shadowBlur=20;
-  ctx.globalAlpha=(1-r/maxR)*0.5;
-  ctx.beginPath();
-  ctx.ellipse(x,y,r*2,r*0.3,0,0,Math.PI*2);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawWireframeBody(ctx,alpha){
-  const cx=W/2,cy=H/2;
-  const scale=Math.min(W,H)*0.35;
-  ctx.save();
-  ctx.globalAlpha=alpha*0.6;
-  ctx.strokeStyle=currentModeColor;
+  ctx.translate(sx,sy);
+  const g=ctx.createRadialGradient(W*.5,H*.48,20,W*.5,H*.48,Math.max(W,H)*.7);
+  g.addColorStop(0,'rgba(60,30,120,.28)');
+  g.addColorStop(.48,'rgba(2,4,14,.22)');
+  g.addColorStop(1,'rgba(0,0,0,.68)');
+  ctx.fillStyle=g;
+  ctx.fillRect(-40,-40,W+80,H+80);
+  ctx.strokeStyle='rgba(80,240,255,.08)';
   ctx.lineWidth=1;
-  ctx.shadowColor=currentModeColor;
-  ctx.shadowBlur=8;
-  
-  // Animated wireframe lines
-  const t=bgTime;
-  const pts=[
-    [0,-1],[0,-0.7],[-0.15,-0.5],[-0.3,-0.2],[-0.35,0.1],
-    [0.15,-0.5],[0.3,-0.2],[0.35,0.1],
-    [-0.1,0.1],[-0.15,0.5],[-0.18,0.9],
-    [0.1,0.1],[0.15,0.5],[0.18,0.9]
-  ];
-  
-  // Body skeleton lines
-  const skel=[
-    [[0,-1],[0,-0.7]],    // head-neck
-    [[0,-0.7],[-0.3,-0.2]], // neck-lshoulder
-    [[0,-0.7],[0.3,-0.2]], // neck-rshoulder
-    [[-0.3,-0.2],[-0.35,0.1]], // lshoulder-lelbow
-    [[0.3,-0.2],[0.35,0.1]], // rshoulder-relbow
-    [[-0.35,0.1],[-0.3,0.4]], // lelbow-lwrist
-    [[0.35,0.1],[0.3,0.4]], // relbow-rwrist
-    [[0,-0.7],[0,0.1]],  // spine
-    [[0,0.1],[-0.15,0.5]], // hip-lknee
-    [[0,0.1],[0.15,0.5]], // hip-rknee
-    [[-0.15,0.5],[-0.18,0.9]], // lknee-lankle
-    [[0.15,0.5],[0.18,0.9]], // rknee-rankle
-  ];
-  
-  skel.forEach(([a,b])=>{
-    const wave=Math.sin(t*3+a[0]*5+a[1]*5)*0.01;
-    ctx.beginPath();
-    ctx.moveTo(cx+a[0]*scale+wave*scale,cy+a[1]*scale);
-    ctx.lineTo(cx+b[0]*scale+wave*scale,cy+b[1]*scale);
-    ctx.stroke();
-  });
-  
-  // Head circle
-  ctx.beginPath();
-  ctx.arc(cx,cy-scale*1.12,scale*0.12,0,Math.PI*2);
-  ctx.stroke();
-  
-  // Body mesh triangles
-  ctx.globalAlpha=alpha*0.05;
-  ctx.fillStyle=currentModeColor;
-  const meshPts=skel.map(([a])=>[cx+a[0]*scale,cy+a[1]*scale]);
-  for(let i=0;i<meshPts.length-2;i+=2){
-    if(meshPts[i]&&meshPts[i+1]&&meshPts[i+2]){
-      ctx.beginPath();
-      ctx.moveTo(meshPts[i][0],meshPts[i][1]);
-      ctx.lineTo(meshPts[i+1][0],meshPts[i+1][1]);
-      ctx.lineTo(meshPts[i+2][0],meshPts[i+2][1]);
-      ctx.closePath();
-      ctx.fill();
-    }
+  for(let x=-120;x<W+120;x+=64){
+    ctx.beginPath();ctx.moveTo(x+Math.sin(time+x*.01)*18,0);ctx.lineTo(x-80,H);ctx.stroke();
   }
-  
-  ctx.restore();
-}
-
-function drawNeuralOverlay(ctx,alpha){
-  const cx=W/2,cy=H/2;
-  ctx.save();
-  ctx.globalAlpha=alpha*0.5;
-  
-  // Neural nodes
-  const nodes=[];
-  for(let i=0;i<20;i++){
-    const angle=i/20*Math.PI*2;
-    const r=80+Math.sin(i*1.7+bgTime)*40;
-    nodes.push({x:cx+Math.cos(angle)*r,y:cy+Math.sin(angle)*r*1.5-50});
-  }
-  
-  // Connections
-  ctx.strokeStyle='#ff00aa';
-  ctx.lineWidth=0.5;
-  nodes.forEach((n,i)=>{
-    nodes.forEach((m,j)=>{
-      if(j<=i)return;
-      const d=Math.hypot(n.x-m.x,n.y-m.y);
-      if(d<150){
-        ctx.globalAlpha=alpha*(1-d/150)*0.3;
-        ctx.beginPath();ctx.moveTo(n.x,n.y);ctx.lineTo(m.x,m.y);ctx.stroke();
-      }
-    });
-  });
-  
-  // Nodes
-  ctx.globalAlpha=alpha*0.8;
-  nodes.forEach(n=>{
-    ctx.fillStyle='#ff00aa';
-    ctx.beginPath();ctx.arc(n.x,n.y,3,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='#ff00aa';
-    ctx.lineWidth=1;
-    ctx.beginPath();ctx.arc(n.x,n.y,6+Math.sin(bgTime*3)*2,0,Math.PI*2);ctx.stroke();
-  });
-  
-  ctx.restore();
-}
-
-function drawPlasmaBody(ctx,alpha){
-  ctx.save();
-  const t=bgTime;
-  for(let i=0;i<8;i++){
-    const hue=(i*45+t*30)%360;
-    const r=100+i*30;
-    const cx2=W/2+Math.cos(t+i)*20;
-    const cy2=H/2+Math.sin(t*0.7+i)*30;
-    const gr=ctx.createRadialGradient(cx2,cy2,r*0.2,cx2,cy2,r);
-    gr.addColorStop(0,`hsla(${hue},100%,60%,${alpha*0.15})`);
-    gr.addColorStop(1,'transparent');
-    ctx.fillStyle=gr;
-    ctx.beginPath();ctx.ellipse(cx2,cy2,r*0.6,r,0,0,Math.PI*2);ctx.fill();
+  for(let y=0;y<H;y+=64){
+    ctx.beginPath();ctx.moveTo(0,y+Math.cos(time+y*.01)*10);ctx.lineTo(W,y-40);ctx.stroke();
   }
   ctx.restore();
 }
 
-// ---- HUD Drawing ----
-let hudPulse=0;
-function drawHUD(){
-  hud.clearRect(0,0,W,H);
-  hudPulse+=0.05;
-  
+function drawHands(){
   if(handData.length===0)return;
-  
-  const lm=handData[0];
-  const pt=(i)=>({x:(1-lm[i].x)*W,y:lm[i].y*H});
-  
-  // Hand landmark dots
-  const palm=pt(9);
-  
-  // Draw all landmarks
-  if(scanPhase>0){
-    hud.save();
-    for(let i=0;i<21;i++){
-      const p=pt(i);
-      const isFingerTip=[4,8,12,16,20].includes(i);
-      hud.beginPath();
-      hud.arc(p.x,p.y,isFingerTip?5:3,0,Math.PI*2);
-      hud.fillStyle=isFingerTip?currentModeColor:'rgba(0,245,255,0.5)';
-      hud.shadowColor=currentModeColor;
-      hud.shadowBlur=isFingerTip?15:5;
-      hud.fill();
-    }
-    
-    // Connections
-    const connections=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-    hud.strokeStyle='rgba(0,245,255,0.3)';
-    hud.lineWidth=1;
-    connections.forEach(([a,b])=>{
-      const pa=pt(a),pb=pt(b);
-      hud.beginPath();hud.moveTo(pa.x,pa.y);hud.lineTo(pb.x,pb.y);hud.stroke();
+  handData.forEach((lm,handIndex)=>{
+    const color=handIndex?'#ff3df2':'#38f7ff';
+    const links=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+    ctx.save();
+    ctx.shadowColor=color;ctx.shadowBlur=18;
+    ctx.strokeStyle=color;ctx.lineWidth=2;
+    links.forEach(([a,b])=>{
+      const pa=screenPoint(lm,a),pb=screenPoint(lm,b);
+      ctx.globalAlpha=.7;ctx.beginPath();ctx.moveTo(pa.x,pa.y);ctx.lineTo(pb.x,pb.y);ctx.stroke();
     });
-    hud.restore();
-  }
-  
-  // Palm lock ring
-  if(gestureState.open){
-    hud.save();
-    const r=30+Math.sin(hudPulse)*5;
-    hud.strokeStyle=currentModeColor;
-    hud.lineWidth=2;
-    hud.shadowColor=currentModeColor;
-    hud.shadowBlur=20;
-    hud.globalAlpha=0.7+Math.sin(hudPulse)*0.3;
-    hud.beginPath();
-    hud.arc(palm.x,palm.y,r,0,Math.PI*2);
-    hud.stroke();
-    // Rotating tick marks
-    for(let i=0;i<8;i++){
-      const a=i/8*Math.PI*2+hudPulse;
-      hud.beginPath();
-      hud.moveTo(palm.x+Math.cos(a)*(r-5),palm.y+Math.sin(a)*(r-5));
-      hud.lineTo(palm.x+Math.cos(a)*(r+5),palm.y+Math.sin(a)*(r+5));
-      hud.stroke();
+    for(let i=0;i<21;i++){
+      const p=screenPoint(lm,i);
+      ctx.globalAlpha=[4,8,12,16,20].includes(i)?1:.62;
+      ctx.fillStyle=color;
+      ctx.beginPath();ctx.arc(p.x,p.y,[4,8,12,16,20].includes(i)?5:3,0,Math.PI*2);ctx.fill();
     }
-    hud.restore();
-  }
-  
-  // Second hand overlay
-  if(handData.length>=2){
-    const lm2=handData[1];
-    const pt2=(i)=>({x:(1-lm2[i].x)*W,y:lm2[i].y*H});
-    const palm2=pt2(9);
-    
-    hud.save();
-    hud.strokeStyle='#ff00aa';
-    hud.lineWidth=2;
-    hud.shadowColor='#ff00aa';
-    hud.shadowBlur=15;
-    // Line between palms
-    hud.beginPath();
-    hud.moveTo(palm.x,palm.y);hud.lineTo(palm2.x,palm2.y);
-    hud.setLineDash([5,5]);
-    hud.stroke();
-    hud.setLineDash([]);
-    hud.restore();
-    
-    // Center label
-    const mx=(palm.x+palm2.x)/2;
-    const my=(palm.y+palm2.y)/2;
-    hud.fillStyle='#ff00aa';
-    hud.font='10px Share Tech Mono';
-    hud.textAlign='center';
-    hud.fillText('FULL BODY MODE',mx,my-15);
-  }
+    ctx.restore();
+  });
 }
 
-// ---- Particles ----
-function updateParticles(){
+function updateAndDrawEffects(){
+  ctx.save();
   particles=particles.filter(p=>p.life>0);
   particles.forEach(p=>{
-    p.x+=p.vx;p.y+=p.vy;p.vy+=p.gravity;p.life-=p.decay;
-    p.vx*=0.98;p.vy*=0.98;
+    if(p.tx!==undefined){p.vx+=(p.tx-p.x)*.004;p.vy+=(p.ty-p.y)*.004;}
+    p.x+=p.vx;p.y+=p.vy;p.vx*=.97;p.vy*=.97;p.life-=p.decay;
+    ctx.save();ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;ctx.shadowColor=p.color;ctx.shadowBlur=14;
+    if(p.shape==='rect'){ctx.fillRect(p.x,p.y,p.size*2,p.size);}
+    else{ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
   });
-  document.getElementById('d-part').textContent=particles.length;
-}
-function drawParticles(){
-  particles.forEach(p=>{
-    sc.save();
-    sc.globalAlpha=p.life;
-    sc.fillStyle=p.color;
-    sc.shadowColor=p.color;
-    sc.shadowBlur=p.trail?15:6;
-    sc.beginPath();
-    sc.arc(p.x,p.y,p.size,0,Math.PI*2);
-    sc.fill();
-    sc.restore();
+
+  orbs=orbs.filter(o=>o.life>0);
+  orbs.forEach(o=>{
+    o.life-=.025;
+    const gr=ctx.createRadialGradient(o.x,o.y,8,o.x,o.y,o.r);
+    gr.addColorStop(0,`rgba(255,255,255,${o.life*.22})`);
+    gr.addColorStop(.42,`rgba(56,247,255,${o.life*.18})`);
+    gr.addColorStop(1,'rgba(56,247,255,0)');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,Math.PI*2);ctx.fill();
   });
+
+  rings=rings.filter(r=>r.life>0);
+  rings.forEach(r=>{
+    r.r+=r.v;r.life-=.022;
+    ctx.save();ctx.globalAlpha=Math.max(0,r.life);ctx.strokeStyle=r.color;ctx.lineWidth=r.thick;ctx.shadowColor=r.color;ctx.shadowBlur=24;
+    ctx.beginPath();ctx.arc(r.x,r.y,r.r,0,Math.PI*2);ctx.stroke();ctx.restore();
+  });
+
+  bolts=bolts.filter(b=>b.life>0);
+  bolts.forEach(b=>{
+    b.life-=.08;
+    ctx.save();ctx.globalAlpha=Math.max(0,b.life);ctx.strokeStyle=b.color;ctx.lineWidth=b.width*b.life;ctx.lineJoin='round';ctx.shadowColor=b.color;ctx.shadowBlur=28;
+    ctx.beginPath();
+    b.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+    ctx.stroke();ctx.restore();
+  });
+
+  portals=portals.filter(p=>p.life>0);
+  portals.forEach(p=>{
+    p.life-=.008;p.rot+=.04;
+    ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=p.life;
+    for(let i=0;i<7;i++){
+      ctx.strokeStyle=i%2?'#38f7ff':'#9c5cff';
+      ctx.lineWidth=2+i*.6;ctx.shadowColor=ctx.strokeStyle;ctx.shadowBlur=30;
+      ctx.beginPath();ctx.ellipse(0,0,p.r+i*8,p.r*.56+i*5,Math.sin(time+i)*.25,0,Math.PI*2);ctx.stroke();
+    }
+    const gr=ctx.createRadialGradient(0,0,0,0,0,p.r);
+    gr.addColorStop(0,'rgba(255,255,255,.18)');
+    gr.addColorStop(.35,'rgba(156,92,255,.24)');
+    gr.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.arc(0,0,p.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  });
+
+  floatingObjects=floatingObjects.filter(o=>o.life>0);
+  floatingObjects.forEach(o=>{
+    o.x+=o.vx;o.y+=o.vy+Math.sin(time*3+o.x)*.35;o.rot+=o.spin;o.life-=.003;o.vx*=.995;o.vy*=.992;
+    ctx.save();ctx.translate(o.x,o.y);ctx.rotate(o.rot);ctx.globalAlpha=Math.min(1,o.life);ctx.strokeStyle=o.color;ctx.fillStyle='rgba(255,255,255,.045)';ctx.lineWidth=2;ctx.shadowColor=o.color;ctx.shadowBlur=20;
+    ctx.beginPath();ctx.rect(-o.size/2,-o.size/2,o.size,o.size);ctx.fill();ctx.stroke();
+    ctx.restore();
+  });
+
+  glitches=glitches.filter(g=>g.life>0);
+  glitches.forEach(g=>{
+    g.life-=.08;
+    for(let i=0;i<12;i++){
+      ctx.fillStyle=i%2?'rgba(255,61,242,.22)':'rgba(56,247,255,.2)';
+      ctx.fillRect(Math.random()*W,Math.random()*H,60+Math.random()*220,2+Math.random()*18);
+    }
+  });
+  ctx.restore();
 }
 
-// ---- Rings ----
-function updateRings(){
-  glowRings=glowRings.filter(r=>r.life>0);
-  glowRings.forEach(r=>{
-    r.r+=r.speed;r.life-=r.decay;
-    if(r.r>r.maxR)r.life-=0.05;
-  });
-}
-function drawRings(){
-  glowRings.forEach(r=>{
-    sc.save();
-    sc.globalAlpha=r.life*0.8;
-    sc.strokeStyle=r.color;
-    sc.lineWidth=r.lineWidth;
-    sc.shadowColor=r.color;
-    sc.shadowBlur=20;
-    sc.beginPath();sc.arc(r.x,r.y,r.r,0,Math.PI*2);sc.stroke();
-    sc.restore();
-  });
+function updateUI(){
+  mana=Math.max(0,mana-.18);
+  document.getElementById('mana').style.width=Math.round(mana)+'%';
 }
 
-// ---- Floating Texts ----
-function drawFloatingTexts(){
-  floatingTexts=floatingTexts.filter(t=>t.life>0);
-  floatingTexts.forEach(t=>{
-    t.y+=t.vy;t.life-=0.008;
-    sc.save();
-    sc.globalAlpha=t.life;
-    sc.fillStyle=t.color;
-    sc.shadowColor=t.color;
-    sc.shadowBlur=10;
-    sc.font=`${t.size}px Share Tech Mono`;
-    sc.fillText(t.text,t.x,t.y);
-    sc.restore();
-  });
-}
-
-// ---- Diagnostics ----
-function startDiagnostics(){
-  setInterval(()=>{
-    diagTargets=[
-      Math.random()*100,Math.random()*100,
-      Math.random()*100,Math.random()*100
-    ];
-  },2000);
-  
-  setInterval(()=>{
-    diagValues=diagValues.map((v,i)=>v+(diagTargets[i]-v)*0.05);
-    ['b1','b2','b3','b4'].forEach((id,i)=>{
-      document.getElementById('diag-'+id).style.width=diagValues[i]+'%';
-    });
-    ['v1','v2','v3','v4'].forEach((id,i)=>{
-      document.getElementById('diag-'+id).textContent=Math.round(diagValues[i])+'%';
-    });
-    document.getElementById('d-freq').textContent=Math.round(diagValues[0]/10+5);
-    document.getElementById('d-mode').textContent=MODES[scanMode];
-  },50);
-}
-
-function resetScan(){
-  scanPhase=0;
-  scanProgress=0;
-  waveTrails=[];
-  hologramAlpha=0;
-  ghostAlpha=0;
-  scanSpeed=3;
-  setStatus('scan',false,'SCAN ENGINE — IDLE');
-  document.getElementById('d-wave').textContent='--';
-  spawnText('READY FOR NEXT SCAN',W/2-90,H/2,currentModeColor);
-}
-
-// ---- Keyboard shortcuts ----
-document.addEventListener('keydown',e=>{
-  if(e.key==='m'||e.key==='M'){
-    cycleScanMode();playSnapSound();
+function loop(){
+  if(!started)return;
+  time+=.016;
+  shake*=.86;
+  drawBackground();
+  processGestures();
+  updateAndDrawEffects();
+  drawHands();
+  if(flash>0){
+    ctx.fillStyle=`rgba(255,255,255,${flash})`;
+    ctx.fillRect(0,0,W,H);
+    flash*=.78;
   }
-  if(e.key===' '){
-    if(scanPhase===0) triggerScan(W/2,H/2);
-  }
-  if(e.key==='r'||e.key==='R'){
-    resetScan();
-  }
-});
-
-// Reveal mode labels
-document.getElementById('d-mode').textContent=MODES[0];
+  updateUI();
+  requestAnimationFrame(loop);
+}
 </script>
 </body>
 </html>
